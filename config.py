@@ -42,7 +42,7 @@ EAR_CONSEC_FRAMES = 20    # Number of consecutive frames below threshold → ala
 # ─────────────────────────────────────────────
 # MOUTH ASPECT RATIO (MAR) — yawn detection
 # ─────────────────────────────────────────────
-MAR_THRESHOLD      = 0.75  # MAR above this value → yawn detected
+MAR_THRESHOLD      = 0.45  # MAR above this value → yawn detected
 YAWN_CONSEC_FRAMES = 15    # Consecutive frames above threshold → confirmed yawn
 
 # ─────────────────────────────────────────────
@@ -78,3 +78,15 @@ LEFT_EYE_END    = 48
 # Mouth (outer): landmarks 48–67
 MOUTH_START = 48
 MOUTH_END   = 68
+
+# -----------------------------------------
+# HEAD POSE DETECTION  (Tier 2)
+# -----------------------------------------
+HEAD_PITCH_THRESHOLD  = 20   # Degrees downward before NODDING fires
+HEAD_YAW_THRESHOLD    = 25   # Degrees left/right before LOOKING_AWAY fires
+HEAD_CONSEC_FRAMES    = 10   # Consecutive frames to confirm a head state
+
+# -----------------------------------------
+# NIGHT VISION  (Tier 2)
+# -----------------------------------------
+LOW_LIGHT_THRESHOLD = 60     # Mean brightness below this triggers enhancement

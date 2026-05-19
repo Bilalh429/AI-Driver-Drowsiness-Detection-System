@@ -333,6 +333,32 @@ if not sessions_df.empty:
 else:
     st.info("No session history found.")
 
+# ── Head Pose & Night Vision Section ─────────────────────────────────────────
+st.markdown("---")
+st.subheader("🧭  Head Pose & Night Vision Stats")
+
+if not df.empty:
+    col_h1, col_h2, col_h3 = st.columns(3)
+    # Latest head state from most recent event (stored as text in stats dict)
+    latest_head = load_latest()
+    col_h1.metric("Night Vision Active",
+                  "ON" if latest_head.get("night_active") else "OFF")
+
+    # Show head alert rate
+    if "head_alert" in df.columns:
+        alert_rate = df["head_alert"].mean() * 100 if "head_alert" in df.columns else 0
+        col_h2.metric("Head Alert Rate", f"{alert_rate:.1f}%")
+
+    nv_stats = {
+        "Night Vision": "AUTO mode — enhances when brightness < threshold",
+        "CLAHE Mode": "Very dark environments — adaptive histogram equalization",
+        "Gamma Mode": "Moderately dim — power-law brightness correction",
+    }
+    for k, v in nv_stats.items():
+        st.caption(f"**{k}**: {v}")
+else:
+    st.info("Start detection to see head pose and night vision data.")
+
 # ── Auto-refresh ──────────────────────────────────────────────────────────────
 st.markdown("---")
 st.caption(f"⏱ Last updated: {datetime.now().strftime('%H:%M:%S')} — "

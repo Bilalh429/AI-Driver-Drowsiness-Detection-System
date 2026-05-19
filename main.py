@@ -52,8 +52,10 @@ from utils.helpers        import (
     open_camera, reconnect_camera,
 )
 from utils.gui import DrowsinessGUI
-from utils.voice_alert import VoiceAlertSystem
-from utils.database    import DetectionDatabase, generate_pdf_report
+from utils.voice_alert  import VoiceAlertSystem
+from utils.database     import DetectionDatabase, generate_pdf_report
+from utils.head_pose    import HeadPoseEstimator, HeadState
+from utils.night_vision import NightVisionEnhancer, EnhancementMode
 
 logger = get_logger("main")
 
@@ -115,6 +117,18 @@ class DetectionWorker:
                                                config.EAR_CONSEC_FRAMES)
         self._yawn_tracker  = YawnTracker(config.MAR_THRESHOLD,
                                           config.YAWN_CONSEC_FRAMES)
+
+        # ── Tier 2: Head pose + Night vision ────────────────────────────
+        self._head_pose    = HeadPoseEstimator(
+            pitch_nod_threshold=config.HEAD_PITCH_THRESHOLD,
+            yaw_turn_threshold=config.HEAD_YAW_THRESHOLD,
+            consec_frames=config.HEAD_CONSEC_FRAMES,
+            draw_axes=True,
+        )
+        self._night_vision = NightVisionEnhancer(
+            mode=EnhancementMode.AUTO,
+            low_light_thresh=config.LOW_LIGHT_THRESHOLD,
+        )
 
         # Session totals
         self._drowsy_total  = 0
@@ -209,6 +223,10 @@ class DetectionWorker:
         tuple  (annotated_frame, stats_dict)
         """
         frame        = np.ascontiguousarray(frame, dtype=np.uint8)
+
+        # ── Night vision enhancement (Tier 2) ─────────────────────────────
+        frame, night_active = self._night_vision.process(frame)
+        frame        = np.ascontiguousarray(frame, dtype=np.uint8)
         gray         = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), dtype=np.uint8)
 
         low_light    = is_low_light(frame, config.LOW_LIGHT_THRESHOLD)
@@ -283,6 +301,13 @@ class DetectionWorker:
 
         eyes_closed = ear < config.EAR_THRESHOLD and face_detected
 
+        # ── Head pose estimation (Tier 2) ────────────────────────────────
+        head_state, head_angles = self._head_pose.process(frame)
+        self._head_pose.draw_state(frame, head_state, head_angles)
+        if head_state.is_alert() and face_detected:
+            self._alarm.start()
+            self._voice.speak("distracted")
+
         # ── Overlay status panel ─────────────────────────────────────────
         draw_status_panel(
             frame,
@@ -311,6 +336,9 @@ class DetectionWorker:
             "blink_count":  self._eye_tracker.blink_count,
             "yawn_count":   self._yawn_tracker.yawn_count,
             "drowsy_total": self._drowsy_total,
+            "head_state":   head_state.label(),
+            "head_alert":   head_state.is_alert(),
+            "night_active": night_active,
         }
 
         return frame, stats
@@ -322,6 +350,7 @@ class DetectionWorker:
         logger.info("Releasing resources …")
         self._alarm.shutdown()
         self._voice.shutdown()
+        self._head_pose.shutdown()
         # Close DB session and generate PDF report
         try:
             self._db.close_session()
